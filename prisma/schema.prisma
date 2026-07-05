@@ -1,0 +1,49 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SourceType {
+  SALES
+  HR
+  FINANCE
+}
+
+model RawUpload {
+  id         Int        @id @default(autoincrement())
+  filename   String
+  sourceType SourceType
+  uploadedAt DateTime   @default(now())
+  rowCount   Int
+}
+
+model SalesTransaction {
+  id           Int      @id @default(autoincrement())
+  date         DateTime
+  repName      String
+  region       String
+  product      String
+  amount       Float
+  customerName String
+}
+
+model Employee {
+  id            Int      @id @default(autoincrement())
+  repName       String
+  region        String
+  department    String
+  hireDate      DateTime
+  monthlyTarget Float
+}
+
+model FinanceTarget {
+  id             Int      @id @default(autoincrement())
+  region         String
+  month          DateTime
+  revenueTarget  Float
+  departmentCost Float
+}
