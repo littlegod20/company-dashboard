@@ -33,7 +33,6 @@ export function useUploadFiles() {
   return useMutation({
     mutationFn: uploadFiles,
     onSuccess: () => {
-      // New data was persisted — refetch dashboards on next visit
       queryClient.invalidateQueries({ queryKey: metricsKeys.all });
     },
   });
