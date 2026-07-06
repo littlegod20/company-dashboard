@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import type { Metrics } from "@/lib/pipeline/metrics";
 import { metricsKeys } from "./keys";
 
@@ -43,5 +43,8 @@ export function useMetrics(filter?: DateRange) {
   return useQuery({
     queryKey: metricsKeys.filtered(filter?.from, filter?.to),
     queryFn:  () => fetchMetrics(filter),
+    // Keep the previous range's data on screen while a new range loads, so the
+    // filter control stays mounted (isPending only fires on the very first load).
+    placeholderData: keepPreviousData,
   });
 }

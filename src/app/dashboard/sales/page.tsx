@@ -11,6 +11,7 @@ export default function SalesDashboardPage() {
   const [filter, setFilter] = useState<DateRange>({});
   const { data, isPending, isError, error, isFetching, refetch } = useMetrics(filter);
 
+  // Full-page skeleton only on the very first load (no data or range yet)
   if (isPending) return <DashboardSkeleton />;
   if (isError) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
   if (!data.hasData || !data.metrics) return <EmptyState />;
@@ -21,9 +22,10 @@ export default function SalesDashboardPage() {
         value={filter}
         onChange={setFilter}
         dataRange={data.dataRange}
-        isLoading={isFetching && !isPending}
+        isLoading={isFetching}
       />
-      <SalesDashboardClient metrics={data.metrics} />
+      {/* Filter stays mounted; only the dashboard body reloads on range changes */}
+      {isFetching ? <DashboardSkeleton /> : <SalesDashboardClient metrics={data.metrics} />}
     </div>
   );
 }
