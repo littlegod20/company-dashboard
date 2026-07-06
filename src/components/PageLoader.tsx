@@ -15,6 +15,33 @@ function Pulse({ className }: { className: string }) {
   return <div className={`animate-pulse rounded bg-slate-200 ${className}`} />;
 }
 
+/** Error state with optional retry */
+export function ErrorState({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry?: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center py-24 text-center gap-4">
+      <div className="text-5xl">⚠️</div>
+      <div>
+        <h2 className="text-xl font-semibold text-slate-800 mb-1">Something went wrong</h2>
+        <p className="text-slate-600 max-w-sm">{message}</p>
+      </div>
+      {onRetry && (
+        <button
+          onClick={onRetry}
+          className="px-5 py-2.5 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-700 transition-colors"
+        >
+          Try again
+        </button>
+      )}
+    </div>
+  );
+}
+
 /** Generic centered spinner for simple pages */
 export function PageSpinner({ label = "Loading…" }: { label?: string }) {
   return (

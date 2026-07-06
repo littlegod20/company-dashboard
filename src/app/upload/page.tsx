@@ -2,6 +2,7 @@
 
 import { useState, useRef, FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { useUploadFiles } from "@/hooks/useUploadFiles";
 
 interface FileInputState {
   file: File | null;
@@ -84,13 +85,22 @@ export default function UploadPage() {
   const [hr, setHr] = useState<FileInputState>({ file: null, error: null });
   const [finance, setFinance] = useState<FileInputState>({ file: null, error: null });
 
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [progress, setProgress] = useState<string | null>(null);
+  // Client-side validation error (server errors come from the mutation)
+  const [validationError, setValidationError] = useState<string | null>(null);
 
-  async function handleSubmit(e: FormEvent) {
+  const upload = useUploadFiles();
+
+  const submitError = validationError ?? (upload.isError ? (upload.error as Error).message : null);
+  const progress = upload.isPending
+    ? "Uploading and processing files…"
+    : upload.isSuccess
+    ? `Done! Processed ${upload.data.summary.enrichedRows} rows. Redirecting…`
+    : null;
+
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    setSubmitError(null);
+    setValidationError(null);
+    upload.reset();
 
     // Client-side validation: all 3 files must be selected
     const missing: string[] = [];
@@ -98,7 +108,7 @@ export default function UploadPage() {
     if (!hr.file) missing.push("Employee / HR Data");
     if (!finance.file) missing.push("Finance Targets");
     if (missing.length > 0) {
-      setSubmitError(`Please select a file for: ${missing.join(", ")}`);
+      setValidationError(`Please select a file for: ${missing.join(", ")}`);
       return;
     }
 
@@ -107,28 +117,15 @@ export default function UploadPage() {
     formData.append("hr", hr.file!);
     formData.append("finance", finance.file!);
 
-    setSubmitting(true);
-    setProgress("Uploading and processing files…");
-
-    try {
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error ?? `Server error ${res.status}`);
-      }
-
-      setProgress(
-        `Done! Processed ${data.summary.enrichedRows} rows. Redirecting…`
-      );
-      // Brief pause so the user sees the success message before redirect
-      setTimeout(() => router.push("/dashboard/sales"), 1000);
-    } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : String(err));
-      setSubmitting(false);
-      setProgress(null);
-    }
+    upload.mutate(formData, {
+      onSuccess: () => {
+        // Brief pause so the user sees the success message before redirect
+        setTimeout(() => router.push("/dashboard/sales"), 1000);
+      },
+    });
   }
+
+  const submitting = upload.isPending || upload.isSuccess;
 
   return (
     <div className="max-w-2xl mx-auto">
