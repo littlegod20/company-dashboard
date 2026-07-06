@@ -1,16 +1,29 @@
 "use client";
 
-import { useMetrics } from "@/hooks/useMetrics";
+import { useState } from "react";
+import { useMetrics, type DateRange } from "@/hooks/useMetrics";
 import EmptyState from "@/components/EmptyState";
 import { DashboardSkeleton, ErrorState } from "@/components/PageLoader";
+import DateRangeFilter from "@/components/DateRangeFilter";
 import SalesDashboardClient from "./SalesDashboardClient";
 
 export default function SalesDashboardPage() {
-  const { data, isPending, isError, error, refetch } = useMetrics();
+  const [filter, setFilter] = useState<DateRange>({});
+  const { data, isPending, isError, error, isFetching, refetch } = useMetrics(filter);
 
   if (isPending) return <DashboardSkeleton />;
   if (isError) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
   if (!data.hasData || !data.metrics) return <EmptyState />;
 
-  return <SalesDashboardClient metrics={data.metrics} />;
+  return (
+    <div className="space-y-6">
+      <DateRangeFilter
+        value={filter}
+        onChange={setFilter}
+        dataRange={data.dataRange}
+        isLoading={isFetching && !isPending}
+      />
+      <SalesDashboardClient metrics={data.metrics} />
+    </div>
+  );
 }
