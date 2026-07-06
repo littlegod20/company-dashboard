@@ -27,3 +27,83 @@ body {
     transform: translateX(350%);
   }
 }
+
+/* ── Print / Save as PDF ─────────────────────────────────────────────────── */
+@media print {
+  /* Hide everything that isn't dashboard content */
+  [data-print-hide],
+  header,
+  nav {
+    display: none !important;
+  }
+
+  /* Remove page background, use white */
+  body {
+    background: #fff !important;
+    color: #000 !important;
+    font-size: 11pt;
+  }
+
+  /* Remove outer padding so content fills the page */
+  main {
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+
+  /* Dashboard sections become normal block elements */
+  .space-y-8 > *,
+  .space-y-6 > * {
+    margin-top: 1.25rem;
+  }
+
+  /* Cards: flat borders, no shadow */
+  .rounded-xl,
+  .rounded-lg {
+    border-radius: 4px !important;
+    box-shadow: none !important;
+    border: 1px solid #d1d5db !important;
+    break-inside: avoid;
+  }
+
+  /* Stat cards: allow 4-up on one row */
+  .grid {
+    display: grid !important;
+  }
+
+  /* Charts: give Recharts SVGs enough height to render legibly */
+  .recharts-wrapper,
+  .recharts-surface {
+    width: 100% !important;
+  }
+
+  /* Tables: clean borders */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  th, td {
+    border: 1px solid #e5e7eb;
+    padding: 4px 8px;
+    font-size: 9pt;
+  }
+  th {
+    background: #f8fafc !important;
+    font-weight: 600;
+  }
+
+  /* Page breaks */
+  h2 {
+    break-after: avoid;
+  }
+  section {
+    break-inside: avoid;
+  }
+
+  /* Print header injected by ExportMenu */
+  [data-print-header] {
+    display: block !important;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #000;
+  }
+}
