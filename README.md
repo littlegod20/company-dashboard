@@ -180,3 +180,46 @@ Pure functions over `EnrichedRow[]`. Revenue targets and costs are **de-duplicat
 ### API Route — `POST /api/upload`
 
 Accepts `multipart/form-data` with fields `sales`, `hr`, `finance`. Runs the full pipeline, persists all cleaned rows to Postgres in a single transaction (full replace on each upload), and returns the computed metrics as JSON. Upload events are logged to `RawUpload` for auditing.
+
+---
+
+## Dashboard Views
+
+### Upload Page (`/upload`)
+
+The entry point for the app. Three separate labeled file inputs — one each for Sales, HR, and Finance data — with client-side `.xlsx` validation before anything is sent to the server. Shows a loading state while the pipeline runs, then redirects to the Sales dashboard on success. Any server-side errors (wrong columns, DB failure) are surfaced inline rather than failing silently.
+
+### Sales Dashboard (`/dashboard/sales`)
+
+Framed around **performance** — who's selling, what's selling, and how regions are tracking against target.
+
+| Section | Chart type | What it answers |
+|---|---|---|
+| KPI strip | Stat cards | Total revenue, overall attainment %, best region |
+| Revenue vs Target by Region | Horizontal bar (green/amber/red by %) | Primary sales KPI — are we hitting targets? |
+| Monthly Revenue Trend | Line chart | Is revenue growing or declining? |
+| Top Reps by Revenue | Horizontal bar | Who are the top performers? |
+| Top Products by Revenue | Horizontal bar | What's driving revenue? |
+
+Target attainment is the hero section — largest chart, positioned first after the KPIs — because that's the number a sales manager opens a dashboard to check.
+
+### Finance Dashboard (`/dashboard/finance`)
+
+Framed around **profitability** — are we making money relative to costs, and are regions running efficiently?
+
+| Section | Chart type | What it answers |
+|---|---|---|
+| KPI strip | Stat cards | Total revenue, total dept cost, net margin, budget attainment |
+| Margin by Region | Grouped bar + table | Which regions are profitable? (Southern Africa flags as loss-making) |
+| Budget Adherence by Region | Grouped bar + table | Revenue vs target vs cost — cost efficiency alongside attainment |
+| Monthly Revenue vs Cost Trend | Composed bar+line chart | Is revenue staying above costs over time? |
+
+The Finance view deliberately excludes rep rankings (a Sales concern) and instead pairs every attainment number with its cost context — a region overperforming its revenue target while also blowing its cost budget is not a finance success story. The margin alert for Southern Africa (−$20K) is highlighted in red automatically.
+
+### Role Separation Design Rationale
+
+Both dashboards share underlying data (target attainment, revenue) but interpret it differently:
+- **Sales** asks: "Did we sell enough, and who drove it?"
+- **Finance** asks: "Did we profit, and was the cost justified?"
+
+The nav bar makes it trivial to switch between views during a demo.
