@@ -1,17 +1,9 @@
 /**
  * POST /api/upload
- *
  * Accepts 3 Excel files via multipart/form-data:
- *   - sales: sales_transactions.xlsx
- *   - hr:    hr_employees.xlsx
- *   - finance: finance_targets.xlsx
- *
- * Pipeline: parse → clean → combine → metrics → persist → respond
- *
- * Files can be uploaded in any order; they are identified by the form field name.
- * All 3 must be present in a single request.
+ *   sales | hr | finance
+ * Pipeline: parse -> clean -> combine -> metrics -> persist -> respond
  */
-
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { parseSales, parseHR, parseFinance } from "@/lib/pipeline/parse";
@@ -22,52 +14,42 @@ import { computeAllMetrics } from "@/lib/pipeline/metrics";
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
-
-    // --- 1. Extract files from form ---
     const salesFile = formData.get("sales") as File | null;
     const hrFile = formData.get("hr") as File | null;
     const financeFile = formData.get("finance") as File | null;
 
     if (!salesFile || !hrFile || !financeFile) {
       return NextResponse.json(
-        {
-          error: "All 3 files required: sales, hr, finance",
-          received: {
-            sales: !!salesFile,
-            hr: !!hrFile,
-            finance: !!financeFile,
-          },
-        },
+        { error: "All 3 files required: sales, hr, finance",
+          received: { sales: !!salesFile, hr: !!hrFile, finance: !!financeFile } },
         { status: 400 }
       );
     }
 
-    // Convert File → Buffer (SheetJS needs a Buffer/ArrayBuffer)
     const [salesBuf, hrBuf, financeBuf] = await Promise.all([
       salesFile.arrayBuffer().then((ab) => Buffer.from(ab)),
       hrFile.arrayBuffer().then((ab) => Buffer.from(ab)),
       financeFile.arrayBuffer().then((ab) => Buffer.from(ab)),
     ]);
 
-    // --- 2. Parse (raw rows from Excel) ---
+    // Stage 1: Parse
     const rawSales = parseSales(salesBuf);
     const rawHR = parseHR(hrBuf);
     const rawFinance = parseFinance(financeBuf);
 
-    // --- 3. Clean (normalise, deduplicate, validate) ---
+    // Stage 2: Clean
     const cleanedSales = cleanSales(rawSales);
     const cleanedHR = cleanHR(rawHR);
     const cleanedFinance = cleanFinance(rawFinance);
 
-    // --- 4. Combine (join into enriched fact rows) ---
+    // Stage 3: Combine
     const enriched = combine(cleanedSales, cleanedHR, cleanedFinance);
 
-    // --- 5. Compute metrics ---
+    // Stage 4: Metrics
     const metrics = computeAllMetrics(enriched);
 
-    // --- 6. Persist to Postgres (wrapped in a transaction) ---
+    // Stage 5: Persist (full replace in a transaction)
     await prisma.$transaction(async (tx) => {
-      // Log upload events for each file
       await tx.rawUpload.createMany({
         data: [
           { filename: salesFile.name, sourceType: "SALES", rowCount: rawSales.length },
@@ -76,54 +58,39 @@ export async function POST(request: NextRequest) {
         ],
       });
 
-      // Full replace on each upload (simpler than upsert for an assessment;
-      // noted in README as a future improvement)
       await tx.salesTransaction.deleteMany();
       await tx.employee.deleteMany();
       await tx.financeTarget.deleteMany();
 
       await tx.salesTransaction.createMany({
-        data: cleanedSales.map((row) => ({
-          date:         new Date(row.date),
-          repName:      row.repName,
-          region:       row.region,
-          product:      row.product,
-          amount:       row.amount,
-          customerName: row.customerName,
+        data: cleanedSales.map((r) => ({
+          date: new Date(r.date), repName: r.repName, region: r.region,
+          product: r.product, amount: r.amount, customerName: r.customerName,
         })),
       });
 
       await tx.employee.createMany({
-        data: cleanedHR.map((row) => ({
-          repName:       row.repName,
-          region:        row.region,
-          department:    row.department,
-          hireDate:      new Date(row.hireDate),
-          monthlyTarget: row.monthlyTarget,
+        data: cleanedHR.map((r) => ({
+          repName: r.repName, region: r.region, department: r.department,
+          hireDate: new Date(r.hireDate), monthlyTarget: r.monthlyTarget,
         })),
       });
 
       await tx.financeTarget.createMany({
-        data: cleanedFinance.map((row) => ({
-          region:         row.region,
-          month:          new Date(`${row.month}-01`),
-          revenueTarget:  row.revenueTarget,
-          departmentCost: row.departmentCost,
+        data: cleanedFinance.map((r) => ({
+          region: r.region, month: new Date(r.month + "-01"),
+          revenueTarget: r.revenueTarget, departmentCost: r.departmentCost,
         })),
       });
     });
 
-    // --- 7. Return metrics as JSON ---
     return NextResponse.json({
       success: true,
       summary: {
-        salesRowsRaw:      rawSales.length,
-        salesRowsCleaned:  cleanedSales.length,
-        hrRowsRaw:         rawHR.length,
-        hrRowsCleaned:     cleanedHR.length,
-        financeRowsRaw:    rawFinance.length,
-        financeRowsCleaned: cleanedFinance.length,
-        enrichedRows:      enriched.length,
+        salesRowsRaw: rawSales.length, salesRowsCleaned: cleanedSales.length,
+        hrRowsRaw: rawHR.length, hrRowsCleaned: cleanedHR.length,
+        financeRowsRaw: rawFinance.length, financeRowsCleaned: cleanedFinance.length,
+        enrichedRows: enriched.length,
       },
       metrics,
     });
