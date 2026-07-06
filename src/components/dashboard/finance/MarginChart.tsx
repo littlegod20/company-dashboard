@@ -6,7 +6,6 @@ import {
 import type { Metrics } from "@/lib/pipeline/metrics";
 import { fmt } from "@/lib/helpers";
 
-/** Revenue / cost / margin bars per region; margin bar colored by sign */
 export default function MarginChart({ data }: { data: Metrics["marginByRegion"] }) {
   return (
     <ResponsiveContainer width="100%" height={220}>

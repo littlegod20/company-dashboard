@@ -6,7 +6,6 @@ import {
 import type { Metrics } from "@/lib/pipeline/metrics";
 import { pct } from "@/lib/helpers";
 
-/** Horizontal bar chart of attainment % per region, colored by threshold */
 export default function AttainmentChart({ data }: { data: Metrics["targetVsActual"] }) {
   return (
     <ResponsiveContainer width="100%" height={200}>

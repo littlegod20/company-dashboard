@@ -1,9 +1,3 @@
-/**
- * POST /api/upload
- * Accepts 3 Excel files via multipart/form-data:
- *   sales | hr | finance
- * Pipeline: parse -> clean -> combine -> metrics -> persist -> respond
- */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { parseSales, parseHR, parseFinance } from "@/lib/pipeline/parse";
@@ -32,23 +26,19 @@ export async function POST(request: NextRequest) {
       financeFile.arrayBuffer().then((ab) => Buffer.from(ab)),
     ]);
 
-    // Stage 1: Parse
     const rawSales = parseSales(salesBuf);
     const rawHR = parseHR(hrBuf);
     const rawFinance = parseFinance(financeBuf);
 
-    // Stage 2: Clean
     const cleanedSales = cleanSales(rawSales);
     const cleanedHR = cleanHR(rawHR);
     const cleanedFinance = cleanFinance(rawFinance);
 
-    // Stage 3: Combine
     const enriched = combine(cleanedSales, cleanedHR, cleanedFinance);
-
-    // Stage 4: Metrics
     const metrics = computeAllMetrics(enriched);
 
-    // Stage 5: Persist (full replace in a transaction)
+    // Each upload fully replaces the previous dataset, so wipe and reinsert
+    // inside one transaction to avoid leaving the tables half-updated.
     await prisma.$transaction(async (tx) => {
       await tx.rawUpload.createMany({
         data: [

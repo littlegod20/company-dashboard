@@ -6,13 +6,12 @@ import {
 import type { Metrics } from "@/lib/pipeline/metrics";
 import { fmt } from "@/lib/helpers";
 
-/** A target-vs-actual row enriched with the region's cost and margin */
+// A target-vs-actual row with the region's cost and margin merged in.
 export type BudgetRow = Metrics["targetVsActual"][number] & {
   cost: number;
   margin: number;
 };
 
-/** Actual revenue, target, and dept cost bars per region */
 export default function BudgetChart({ data }: { data: BudgetRow[] }) {
   return (
     <ResponsiveContainer width="100%" height={240}>

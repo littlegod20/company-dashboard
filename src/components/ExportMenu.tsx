@@ -1,19 +1,5 @@
 "use client";
 
-/**
- * ExportMenu
- *
- * A dropdown button that offers two export formats:
- *   1. Excel (.xlsx)  — multi-sheet workbook, instant client-side download
- *   2. Print / PDF   — injects a print header then calls window.print()
- *                      so the user can "Save as PDF" from the browser dialog
- *
- * Props:
- *   metrics      — current metrics snapshot (reflects active date filter)
- *   filterLabel  — human-readable filter string, e.g. "2026-03 – 2026-05"
- *   view         — "sales" | "finance" (used in filename + print header)
- */
-
 import { useState, useRef, useEffect } from "react";
 import type { Metrics } from "@/lib/pipeline/metrics";
 import { exportToExcel } from "@/lib/export/toExcel";
@@ -29,7 +15,6 @@ export default function ExportMenu({ metrics, filterLabel, view }: Props) {
   const [exporting, setExporting] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Close on outside click
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -40,7 +25,6 @@ export default function ExportMenu({ metrics, filterLabel, view }: Props) {
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, [open]);
 
-  // Close on Escape
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
@@ -62,10 +46,11 @@ export default function ExportMenu({ metrics, filterLabel, view }: Props) {
   function handlePrint() {
     setOpen(false);
 
-    // Inject a temporary print-only header so the PDF has title + date context
+    // A print-only header gives the exported PDF a title and date context.
+    // It's hidden on screen and revealed by the @media print stylesheet.
     const header = document.createElement("div");
     header.setAttribute("data-print-header", "true");
-    header.style.display = "none"; // shown by @media print CSS
+    header.style.display = "none";
     header.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:baseline;">
         <strong style="font-size:16pt;">Company Dashboard — ${view === "sales" ? "Sales" : "Finance"} View</strong>
@@ -81,7 +66,6 @@ export default function ExportMenu({ metrics, filterLabel, view }: Props) {
 
     window.print();
 
-    // Remove injected header after the print dialog closes
     header.remove();
   }
 
@@ -126,7 +110,6 @@ export default function ExportMenu({ metrics, filterLabel, view }: Props) {
           className="absolute right-0 mt-1.5 w-52 rounded-lg border border-slate-200 bg-white shadow-lg z-50 overflow-hidden"
           role="menu"
         >
-          {/* Excel option */}
           <button
             role="menuitem"
             onClick={handleExcel}
@@ -134,7 +117,6 @@ export default function ExportMenu({ metrics, filterLabel, view }: Props) {
               hover:bg-slate-50 transition-colors text-left"
           >
             <span className="flex-shrink-0 text-green-600">
-              {/* spreadsheet icon */}
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM8.5 18H7v-1.5h1.5V18zm0-3H7v-1.5h1.5V15zm0-3H7v-1.5h1.5V12zm4.5 6h-3v-1.5h3V18zm0-3h-3v-1.5h3V15zm0-3h-3v-1.5h3V12zm3 6h-1.5v-1.5H16V18zm0-3h-1.5v-1.5H16V15zm0-3h-1.5v-1.5H16V12z" />
               </svg>
@@ -147,7 +129,6 @@ export default function ExportMenu({ metrics, filterLabel, view }: Props) {
 
           <div className="border-t border-slate-100" />
 
-          {/* Print / PDF option */}
           <button
             role="menuitem"
             onClick={handlePrint}
@@ -155,7 +136,6 @@ export default function ExportMenu({ metrics, filterLabel, view }: Props) {
               hover:bg-slate-50 transition-colors text-left"
           >
             <span className="flex-shrink-0 text-red-500">
-              {/* PDF/print icon */}
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M19 8H5a3 3 0 00-3 3v5h4v3h12v-3h4v-5a3 3 0 00-3-3zm-3 11H8v-5h8v5zm3-7a1 1 0 110-2 1 1 0 010 2zm-1-9H6v4h12V3z" />
               </svg>

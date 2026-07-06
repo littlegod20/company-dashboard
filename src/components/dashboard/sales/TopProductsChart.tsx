@@ -6,7 +6,6 @@ import {
 import type { Metrics } from "@/lib/pipeline/metrics";
 import { dollarTip } from "@/lib/helpers";
 
-/** Top 8 products by revenue */
 export default function TopProductsChart({ data }: { data: Metrics["topProducts"] }) {
   return (
     <ResponsiveContainer width="100%" height={260}>

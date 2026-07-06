@@ -1,7 +1,6 @@
 import type { Metrics } from "@/lib/pipeline/metrics";
 import { fmt } from "@/lib/helpers";
 
-/** Warning banner shown when a region is operating at a loss */
 export default function MarginAlert({
   worst,
 }: {

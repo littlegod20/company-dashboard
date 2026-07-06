@@ -1,19 +1,5 @@
 "use client";
 
-/**
- * DateRangeFilter
- *
- * Sits above dashboard charts. Provides:
- *   - Quick presets: All | Last 3M | Last 6M
- *   - Custom "from" / "to" month inputs bounded to the available data range
- *
- * Props:
- *   value       — current active filter { from?, to? }
- *   onChange    — called with the new filter when user changes anything
- *   dataRange   — { from, to } of the full available data (used for input min/max)
- *   isLoading   — dims the control while metrics are refetching
- */
-
 import { type DateRange } from "@/hooks/useMetrics";
 
 interface Props {
@@ -25,19 +11,10 @@ interface Props {
 
 type PresetKey = "all" | "3m" | "6m" | "custom";
 
-/** Subtract N months from a "YYYY-MM" string */
 function subtractMonths(ym: string, n: number): string {
   const [y, m] = ym.split("-").map(Number);
   const total = y * 12 + (m - 1) - n;
   return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, "0")}`;
-}
-
-/** Clamp a value to [min, max] — all as "YYYY-MM" strings */
-function clamp(val: string, min?: string | null, max?: string | null): string {
-  let v = val;
-  if (min && v < min) v = min;
-  if (max && v > max) v = max;
-  return v;
 }
 
 function detectPreset(value: DateRange, dataRange?: { from: string | null; to: string | null }): PresetKey {
@@ -51,7 +28,7 @@ function detectPreset(value: DateRange, dataRange?: { from: string | null; to: s
 
 export default function DateRangeFilter({ value, onChange, dataRange, isLoading }: Props) {
   const minMonth = dataRange?.from ?? undefined;
-  const maxMonth = dataRange?.to   ?? undefined;
+  const maxMonth = dataRange?.to ?? undefined;
 
   const activePreset = detectPreset(value, dataRange);
 
@@ -64,12 +41,12 @@ export default function DateRangeFilter({ value, onChange, dataRange, isLoading 
     } else if (key === "6m") {
       onChange({ from: subtractMonths(maxMonth, 5), to: maxMonth });
     }
-    // "custom" is not triggered via preset button — it's inferred from manual inputs
+    // "custom" isn't a button — it's inferred when the user edits the inputs.
   }
 
   function handleFrom(e: React.ChangeEvent<HTMLInputElement>) {
     const from = e.target.value || undefined;
-    // Ensure from ≤ to
+    // Keep from ≤ to.
     const to = value.to && from && from > value.to ? from : value.to;
     onChange({ from, to });
   }
@@ -82,8 +59,8 @@ export default function DateRangeFilter({ value, onChange, dataRange, isLoading 
 
   const presets: { key: PresetKey; label: string }[] = [
     { key: "all", label: "All time" },
-    { key: "3m",  label: "Last 3M"  },
-    { key: "6m",  label: "Last 6M"  },
+    { key: "3m", label: "Last 3M" },
+    { key: "6m", label: "Last 6M" },
   ];
 
   const activeLabel =
@@ -98,7 +75,6 @@ export default function DateRangeFilter({ value, onChange, dataRange, isLoading 
       }`}
       aria-label="Date range filter"
     >
-      {/* Label + active summary */}
       <div className="flex-1 min-w-0">
         <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-0.5">
           Date range
@@ -106,7 +82,6 @@ export default function DateRangeFilter({ value, onChange, dataRange, isLoading 
         <p className="text-sm font-medium text-slate-800 truncate">{activeLabel}</p>
       </div>
 
-      {/* Quick presets */}
       <div className="flex items-center gap-1.5">
         {presets.map(({ key, label }) => (
           <button
@@ -124,10 +99,8 @@ export default function DateRangeFilter({ value, onChange, dataRange, isLoading 
         ))}
       </div>
 
-      {/* Divider */}
       <div className="hidden sm:block w-px h-8 bg-slate-200" />
 
-      {/* Custom month inputs */}
       <div className="flex items-center gap-2 text-sm">
         <div className="flex flex-col">
           <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-0.5">
@@ -163,7 +136,6 @@ export default function DateRangeFilter({ value, onChange, dataRange, isLoading 
           />
         </div>
 
-        {/* Clear custom filter */}
         {(value.from || value.to) && (
           <button
             onClick={() => onChange({})}

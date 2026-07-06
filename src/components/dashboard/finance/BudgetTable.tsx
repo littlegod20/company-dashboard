@@ -1,7 +1,6 @@
 import { pct } from "@/lib/helpers";
 import type { BudgetRow } from "./BudgetChart";
 
-/** Attainment + cost efficiency assessment per region */
 export default function BudgetTable({ data }: { data: BudgetRow[] }) {
   return (
     <div className="mt-4 overflow-x-auto">

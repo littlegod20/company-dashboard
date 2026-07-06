@@ -14,7 +14,6 @@ import TopProductsChart from "@/components/dashboard/sales/TopProductsChart";
 export default function SalesDashboardClient({ metrics }: { metrics: Metrics }) {
   const { revenueTrend, targetVsActual, topProducts, topReps, totalRevenue, rowCount } = metrics;
 
-  // Best-attaining region for a quick stat
   const best = [...targetVsActual].sort((a, b) => b.attainmentPct - a.attainmentPct)[0];
   const overallAttainment =
     targetVsActual.reduce((s, r) => s + r.actual, 0) /
@@ -27,7 +26,6 @@ export default function SalesDashboardClient({ metrics }: { metrics: Metrics }) 
         subtitle={`${rowCount} transactions · Performance vs targets by region and rep`}
       />
 
-      {/* KPI strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <StatCard label="Total Revenue" value={fmt(totalRevenue)} accent="blue" />
         <StatCard

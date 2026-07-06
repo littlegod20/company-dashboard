@@ -1,4 +1,3 @@
-/** Simple metric summary card — shows a label + formatted value */
 export default function StatCard({
   label,
   value,
@@ -13,9 +12,9 @@ export default function StatCard({
   const accents: Record<string, string> = {
     slate: "border-slate-300 bg-white",
     green: "border-green-400 bg-green-50",
-    blue:  "border-blue-400 bg-blue-50",
+    blue: "border-blue-400 bg-blue-50",
     amber: "border-amber-400 bg-amber-50",
-    red:   "border-red-400 bg-red-50",
+    red: "border-red-400 bg-red-50",
   };
 
   return (

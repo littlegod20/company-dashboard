@@ -1,4 +1,3 @@
-/** Top progress bar — shown immediately when navigation starts */
 export function NavigationBar() {
   return (
     <div
@@ -15,7 +14,6 @@ function Pulse({ className }: { className: string }) {
   return <div className={`animate-pulse rounded bg-slate-200 ${className}`} />;
 }
 
-/** Error state with optional retry */
 export function ErrorState({
   message,
   onRetry,
@@ -42,7 +40,6 @@ export function ErrorState({
   );
 }
 
-/** Generic centered spinner for simple pages */
 export function PageSpinner({ label = "Loading…" }: { label?: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-24 gap-4">
@@ -52,7 +49,6 @@ export function PageSpinner({ label = "Loading…" }: { label?: string }) {
   );
 }
 
-/** Skeleton matching dashboard layout (KPI strip + chart sections) */
 export function DashboardSkeleton() {
   return (
     <div className="space-y-8 animate-pulse">

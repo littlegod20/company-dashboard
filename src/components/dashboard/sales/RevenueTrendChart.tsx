@@ -6,7 +6,6 @@ import {
 import type { Metrics } from "@/lib/pipeline/metrics";
 import { dollarTip } from "@/lib/helpers";
 
-/** Monthly revenue line chart */
 export default function RevenueTrendChart({ data }: { data: Metrics["revenueTrend"] }) {
   return (
     <ResponsiveContainer width="100%" height={240}>

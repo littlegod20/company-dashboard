@@ -5,7 +5,6 @@ import {
 } from "recharts";
 import { fmt } from "@/lib/helpers";
 
-/** Monthly revenue with estimated cost allocation */
 export interface MonthlyCostRevenue {
   month: string;
   revenue: number;

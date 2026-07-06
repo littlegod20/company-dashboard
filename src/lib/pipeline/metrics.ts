@@ -1,24 +1,7 @@
-/**
- * metrics.ts
- * Stage 4: Compute business metrics from the enriched combined dataset.
- *
- * All computations are pure functions — no DB access here. This keeps
- * the metric logic testable and separable from persistence.
- *
- * Metrics produced:
- *   1. revenueTrend       — total revenue per month (time-series)
- *   2. targetVsActual     — actual revenue vs target by region
- *   3. topProducts        — top N products by total revenue
- *   4. marginByRegion     — revenue minus department cost by region
- *   5. topReps            — top N sales reps by total revenue
- */
-
 import type { EnrichedRow } from "./combine";
 
-// ---------- Output types ----------
-
 export interface MonthlyRevenue {
-  month: string;   // "YYYY-MM"
+  month: string;
   revenue: number;
 }
 
@@ -26,7 +9,7 @@ export interface RegionTargetActual {
   region: string;
   actual: number;
   target: number;
-  attainmentPct: number; // (actual / target) * 100, or null if no target
+  attainmentPct: number;
 }
 
 export interface ProductRevenue {
@@ -38,7 +21,7 @@ export interface RegionMargin {
   region: string;
   revenue: number;
   cost: number;
-  margin: number; // revenue - cost
+  margin: number;
 }
 
 export interface RepRevenue {
@@ -57,8 +40,6 @@ export interface Metrics {
   rowCount: number;
 }
 
-// ---------- Helper: sum a field grouped by a key ----------
-
 function groupSum<T>(
   rows: T[],
   keyFn: (r: T) => string,
@@ -72,9 +53,8 @@ function groupSum<T>(
   return map;
 }
 
-// ---------- Metric computations ----------
 
-/** 1. Revenue by month, sorted chronologically */
+/** Revenue by month, sorted chronologically */
 export function computeRevenueTrend(rows: EnrichedRow[]): MonthlyRevenue[] {
   const byMonth = groupSum(
     rows,
@@ -86,7 +66,7 @@ export function computeRevenueTrend(rows: EnrichedRow[]): MonthlyRevenue[] {
     .map(([month, revenue]) => ({ month, revenue: round2(revenue) }));
 }
 
-/** 2. Actual vs target by region.
+/** Actual vs target by region.
  *  Target comes from the Finance table (sum of monthly revenueTarget
  *  across all months in the dataset per region).
  *  Attainment = actual / target * 100. If no target set, attainmentPct = 0.
@@ -94,10 +74,7 @@ export function computeRevenueTrend(rows: EnrichedRow[]): MonthlyRevenue[] {
 export function computeTargetVsActual(rows: EnrichedRow[]): RegionTargetActual[] {
   const actualByRegion = groupSum(rows, (r) => r.region, (r) => r.amount);
 
-  // Sum targets: one finance row per region+month → aggregate per region
-  // Use a Set to avoid double-counting when multiple sales share the same
-  // region+month (the target is per-region-month, not per-sale)
-  const targetByRegion = new Map<string, number>();
+   const targetByRegion = new Map<string, number>();
   const seenFinanceKeys = new Set<string>();
   for (const row of rows) {
     const key = `${row.region}|${row.yearMonth}`;
@@ -121,7 +98,7 @@ export function computeTargetVsActual(rows: EnrichedRow[]): RegionTargetActual[]
   });
 }
 
-/** 3. Top products by total revenue (default: top 10) */
+/** Top products by total revenue (default: top 10) */
 export function computeTopProducts(rows: EnrichedRow[], topN = 10): ProductRevenue[] {
   const byProduct = groupSum(rows, (r) => r.product, (r) => r.amount);
   return [...byProduct.entries()]
@@ -130,7 +107,7 @@ export function computeTopProducts(rows: EnrichedRow[], topN = 10): ProductReven
     .slice(0, topN);
 }
 
-/** 4. Margin by region: revenue − department cost.
+/**  Margin by region: revenue − department cost.
  *  Cost is also de-duped per region+month (same logic as targets).
  */
 export function computeMarginByRegion(rows: EnrichedRow[]): RegionMargin[] {
@@ -165,10 +142,10 @@ export function computeMarginByRegion(rows: EnrichedRow[]): RegionMargin[] {
   });
 }
 
-/** 5. Top reps by total revenue (default: top 10) */
+/** Top reps by total revenue (default: top 10) */
 export function computeTopReps(rows: EnrichedRow[], topN = 10): RepRevenue[] {
   const revenueByRep = groupSum(rows, (r) => r.repName, (r) => r.amount);
-  // Also grab their region from the first matching row
+
   const regionByRep = new Map<string, string>();
   for (const row of rows) {
     if (!regionByRep.has(row.repName)) regionByRep.set(row.repName, row.region);
@@ -184,7 +161,6 @@ export function computeTopReps(rows: EnrichedRow[], topN = 10): RepRevenue[] {
     .slice(0, topN);
 }
 
-/** Convenience: run all metrics at once */
 export function computeAllMetrics(rows: EnrichedRow[]): Metrics {
   return {
     revenueTrend: computeRevenueTrend(rows),

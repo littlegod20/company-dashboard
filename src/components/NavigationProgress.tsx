@@ -4,17 +4,16 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { NavigationBar } from "./PageLoader";
 
-/** Shows a top progress bar as soon as an internal link is clicked */
 export default function NavigationProgress() {
   const pathname = usePathname();
   const [loading, setLoading] = useState(false);
 
-  // Clear the bar once the new route is active
   useEffect(() => {
     setLoading(false);
   }, [pathname]);
 
-  // Start the bar on in-app link clicks (before React Suspense kicks in)
+  // Show the bar the moment an in-app link is clicked, before the route
+  // transition (and Suspense) actually begins.
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       const anchor = (e.target as Element).closest("a");

@@ -1,4 +1,3 @@
-/** White card section with a title, optional description, content, and footnote */
 export default function DashboardSection({
   title,
   description,

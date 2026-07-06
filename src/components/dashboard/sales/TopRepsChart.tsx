@@ -7,14 +7,13 @@ import type { Metrics } from "@/lib/pipeline/metrics";
 import { dollarTip } from "@/lib/helpers";
 
 const REGION_COLORS: Record<string, string> = {
-  "West Africa":     "#3b82f6",
-  "East Africa":     "#10b981",
-  "North Africa":    "#f59e0b",
+  "West Africa": "#3b82f6",
+  "East Africa": "#10b981",
+  "North Africa": "#f59e0b",
   "Southern Africa": "#8b5cf6",
 };
 const FALLBACK_COLOR = "#64748b";
 
-/** Top 8 reps by revenue, bar color keyed to region */
 export default function TopRepsChart({ data }: { data: Metrics["topReps"] }) {
   const top = data.slice(0, 8);
   return (

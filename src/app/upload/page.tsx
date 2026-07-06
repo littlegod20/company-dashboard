@@ -32,7 +32,7 @@ function FileInput({
     }
     if (!file.name.endsWith(".xlsx")) {
       onChange(null, "Only .xlsx files are accepted.");
-      // reset the input so the user can pick again
+      // Reset so the same file can be re-picked after fixing it.
       if (inputRef.current) inputRef.current.value = "";
       return;
     }
@@ -85,7 +85,7 @@ export default function UploadPage() {
   const [hr, setHr] = useState<FileInputState>({ file: null, error: null });
   const [finance, setFinance] = useState<FileInputState>({ file: null, error: null });
 
-  // Client-side validation error (server errors come from the mutation)
+  // Client-side validation; server errors surface through the mutation.
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const upload = useUploadFiles();
@@ -102,7 +102,6 @@ export default function UploadPage() {
     setValidationError(null);
     upload.reset();
 
-    // Client-side validation: all 3 files must be selected
     const missing: string[] = [];
     if (!sales.file) missing.push("Sales Transactions");
     if (!hr.file) missing.push("Employee / HR Data");
@@ -119,7 +118,7 @@ export default function UploadPage() {
 
     upload.mutate(formData, {
       onSuccess: () => {
-        // Brief pause so the user sees the success message before redirect
+        // Let the success message show briefly before redirecting.
         setTimeout(() => router.push("/dashboard/sales"), 1000);
       },
     });

@@ -15,25 +15,22 @@ import CostVsRevenueChart, { type MonthlyCostRevenue } from "@/components/dashbo
 export default function FinanceDashboardClient({ metrics }: { metrics: Metrics }) {
   const { revenueTrend, targetVsActual, marginByRegion, totalRevenue } = metrics;
 
-  // Finance-specific aggregates
   const totalCost = marginByRegion.reduce((s, r) => s + r.cost, 0);
   const totalMargin = totalRevenue - totalCost;
   const marginPct = totalRevenue > 0 ? (totalMargin / totalRevenue) * 100 : 0;
   const totalTarget = targetVsActual.reduce((s, r) => s + r.target, 0);
   const overallAttainment = totalTarget > 0 ? (totalRevenue / totalTarget) * 100 : 0;
 
-  // Under-budget flag: highlight the worst-performing region if it's at a loss
   const worstMargin = [...marginByRegion].sort((a, b) => a.margin - b.margin)[0];
 
-  // Distribute total cost proportionally to each month's revenue share.
-  // Month-level cost data isn't stored yet — see README for the improvement note.
+  // We don't store cost per month, so split total cost across months in
+  // proportion to each month's revenue share. See README for the follow-up.
   const monthlyCostVsRevenue: MonthlyCostRevenue[] = revenueTrend.map((m) => ({
     month: m.month,
     revenue: m.revenue,
     cost: Math.round((m.revenue / totalRevenue) * totalCost),
   }));
 
-  // Budget adherence: target vs actual with cost + margin overlay
   const budgetData: BudgetRow[] = targetVsActual.map((r) => {
     const margin = marginByRegion.find((m) => m.region === r.region);
     return { ...r, cost: margin?.cost ?? 0, margin: margin?.margin ?? 0 };
@@ -46,7 +43,6 @@ export default function FinanceDashboardClient({ metrics }: { metrics: Metrics }
         subtitle="Profitability, budget adherence, and cost management by region"
       />
 
-      {/* KPI strip — Finance framing: margin and cost, not just revenue */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <StatCard label="Total Revenue" value={fmt(totalRevenue)} accent="blue" />
         <StatCard label="Total Dept Cost" value={fmt(totalCost)} accent="slate" />

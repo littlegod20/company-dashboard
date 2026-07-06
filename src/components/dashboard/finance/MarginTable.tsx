@@ -1,7 +1,6 @@
 import type { Metrics } from "@/lib/pipeline/metrics";
 import { fmt, pct } from "@/lib/helpers";
 
-/** Per-region revenue, cost, margin, and margin % */
 export default function MarginTable({ data }: { data: Metrics["marginByRegion"] }) {
   return (
     <div className="mt-4 overflow-x-auto">

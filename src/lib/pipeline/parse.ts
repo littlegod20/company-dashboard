@@ -10,8 +10,6 @@
 
 import * as XLSX from "xlsx";
 
-// ---------- Raw row types (mirrors actual spreadsheet columns) ----------
-
 export interface RawSalesRow {
   date: Date | string | number | null;
   repName: string | null;
@@ -31,7 +29,7 @@ export interface RawHRRow {
 
 export interface RawFinanceRow {
   region: string | null;
-  month: string | null; // e.g. "2026-01" or "July 2026"
+  month: string | null;
   revenueTarget: number | null;
   departmentCost: number | null;
 }
@@ -50,20 +48,6 @@ function loadWorkbook(source: Buffer | string): XLSX.WorkBook {
 }
 
 /**
- * Get all rows from the first sheet as plain objects.
- * Returns [headers, ...dataRows] with header keys lowercased and spaces → underscores.
- */
-function sheetToRows(wb: XLSX.WorkBook): Record<string, unknown>[] {
-  const sheetName = wb.SheetNames[0];
-  const ws = wb.Sheets[sheetName];
-  // header:1 keeps the first row as the header array; raw:false converts numbers/dates
-  return XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
-    defval: null,
-    raw: false, // let SheetJS format dates as JS Date objects (we set cellDates:true)
-  });
-}
-
-/**
  * Parse a workbook with cellDates:true so date cells come back as JS Date objects.
  * We re-read with raw:true for numeric access too.
  */
@@ -72,11 +56,10 @@ function sheetToRawRows(wb: XLSX.WorkBook): Record<string, unknown>[] {
   const ws = wb.Sheets[sheetName];
   return XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
     defval: null,
-    raw: true, // keep dates as Date objects (because cellDates:true on read)
+    raw: true,
   });
 }
 
-// ---------- File-specific parsers ----------
 
 /**
  * Parse sales_transactions.xlsx
@@ -87,18 +70,12 @@ export function parseSales(source: Buffer | string): RawSalesRow[] {
   const rows = sheetToRawRows(wb);
 
   return rows.map((row) => ({
-    // Actual header: "Date"
     date: (row["Date"] as Date | string | number | null) ?? null,
-    // Actual header: "Rep Name"
     repName: row["Rep Name"] != null ? String(row["Rep Name"]) : null,
     region: row["Region"] != null ? String(row["Region"]) : null,
     product: row["Product"] != null ? String(row["Product"]) : null,
-    // Actual header: "Amount (USD)"
-    amount:
-      row["Amount (USD)"] != null ? Number(row["Amount (USD)"]) : null,
-    // Actual header: "Customer Name"
-    customerName:
-      row["Customer Name"] != null ? String(row["Customer Name"]) : null,
+    amount: row["Amount (USD)"] != null ? Number(row["Amount (USD)"]) : null,
+    customerName: row["Customer Name"] != null ? String(row["Customer Name"]) : null,
   }));
 }
 
@@ -114,14 +91,9 @@ export function parseHR(source: Buffer | string): RawHRRow[] {
     repName: row["Rep Name"] != null ? String(row["Rep Name"]) : null,
     region: row["Region"] != null ? String(row["Region"]) : null,
     department: row["Department"] != null ? String(row["Department"]) : null,
-    // Hire Date is a mix: some are JS Date objects, some are strings like
-    // "23/05/2022" or "2023-06-02" — clean.ts will normalise all of these
-    hireDate:
-      (row["Hire Date"] as Date | string | number | null) ?? null,
+    hireDate: (row["Hire Date"] as Date | string | number | null) ?? null,
     monthlyTarget:
-      row["Monthly Target (USD)"] != null
-        ? Number(row["Monthly Target (USD)"])
-        : null,
+      row["Monthly Target (USD)"] != null ? Number(row["Monthly Target (USD)"]) : null,
   }));
 }
 
@@ -138,12 +110,8 @@ export function parseFinance(source: Buffer | string): RawFinanceRow[] {
     region: row["Region"] != null ? String(row["Region"]) : null,
     month: row["Month"] != null ? String(row["Month"]) : null,
     revenueTarget:
-      row["Revenue Target (USD)"] != null
-        ? Number(row["Revenue Target (USD)"])
-        : null,
+      row["Revenue Target (USD)"] != null ? Number(row["Revenue Target (USD)"]) : null,
     departmentCost:
-      row["Department Cost (USD)"] != null
-        ? Number(row["Department Cost (USD)"])
-        : null,
+      row["Department Cost (USD)"] != null ? Number(row["Department Cost (USD)"]) : null,
   }));
 }

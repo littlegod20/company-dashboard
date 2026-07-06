@@ -1,4 +1,3 @@
-/** Page-level dashboard header: bold title + muted subtitle */
 export default function DashboardHeader({
   title,
   subtitle,

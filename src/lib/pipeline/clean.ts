@@ -1,27 +1,7 @@
-/**
- * clean.ts
- * Stage 2: Normalise raw parsed data before joining.
- *
- * Decisions made here (all documented inline):
- *  - Trim all string fields (handles trailing spaces found in real data)
- *  - Dates → ISO "YYYY-MM-DD" strings; hire dates handle multiple string formats
- *  - Finance months → "YYYY-MM" (handles "July 2026" mixed with "2026-01")
- *  - Null amounts → row excluded (no revenue = nothing useful to measure)
- *  - Null monthly targets → excluded from HR (can't compute target attainment)
- *  - Duplicate HR rows for same rep name → keep the first (usually the one
- *    with a target); log both so the caller can audit
- *  - Near-duplicate rep names (trailing spaces, Kwame Owusu vs Kwame Owusu-Ansah)
- *    handled by trim first, then explicit fuzzy-check with Levenshtein; flagged
- *    in logs but NOT silently merged because they may be genuinely different people
- *  - Exact duplicate rows → removed (same rep+date+amount+product)
- */
-
 import type { RawSalesRow, RawHRRow, RawFinanceRow } from "./parse";
 
-// ---------- Cleaned row types ----------
-
 export interface CleanSalesRow {
-  date: string; // "YYYY-MM-DD"
+  date: string;
   repName: string;
   region: string;
   product: string;
@@ -33,33 +13,34 @@ export interface CleanHRRow {
   repName: string;
   region: string;
   department: string;
-  hireDate: string; // "YYYY-MM-DD"
+  hireDate: string;
   monthlyTarget: number;
 }
 
 export interface CleanFinanceRow {
   region: string;
-  month: string; // "YYYY-MM"
+  month: string;
   revenueTarget: number;
   departmentCost: number;
 }
 
-// ---------- Date helpers ----------
-
 const MONTH_NAMES: Record<string, string> = {
-  january: "01", february: "02", march: "03", april: "04",
-  may: "05", june: "06", july: "07", august: "08",
-  september: "09", october: "10", november: "11", december: "12",
+  january: "01",
+  february: "02",
+  march: "03",
+  april: "04",
+  may: "05",
+  june: "06",
+  july: "07",
+  august: "08",
+  september: "09",
+  october: "10",
+  november: "11",
+  december: "12",
 };
 
-/**
- * Parse any date-ish value into a "YYYY-MM-DD" string.
- * Handles:
- *   - JS Date objects (from SheetJS cellDates:true)
- *   - "23/05/2022" (DD/MM/YYYY)
- *   - "2023-06-02" (ISO)
- *   - Excel serial numbers (rare fallback)
- */
+// The source files mix Date objects, DD/MM/YYYY, ISO strings, and the odd
+// Excel serial number, so we normalise everything to "YYYY-MM-DD" here.
 export function toISODate(raw: Date | string | number | null): string | null {
   if (raw == null) return null;
 
@@ -69,58 +50,46 @@ export function toISODate(raw: Date | string | number | null): string | null {
   }
 
   if (typeof raw === "number") {
-    // Excel serial date: days since 1900-01-01 (with the 1900 leap-year bug)
+    // Excel serial dates count days from 1900-01-01 and include the fake 1900 leap day.
     const d = new Date(Date.UTC(1899, 11, 30) + raw * 86400000);
     return d.toISOString().slice(0, 10);
   }
 
   const s = raw.trim();
 
-  // "23/05/2022" → DD/MM/YYYY
   const ddmmyyyy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (ddmmyyyy) {
     const [, d, m, y] = ddmmyyyy;
     return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
   }
 
-  // "2023-06-02" → already ISO
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
 
-  // Fallback: try JS Date parse (handles many locale variants)
   const parsed = new Date(s);
   if (!isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
 
   return null;
 }
 
-/**
- * Parse a month value to "YYYY-MM".
- * Handles:
- *   - "2026-01"  → already good
- *   - "July 2026" → "2026-07"
- */
+// Finance months arrive as "2026-01", "July 2026", or "2026/01".
 function toYearMonth(raw: string | null): string | null {
   if (!raw) return null;
   const s = raw.trim();
 
   if (/^\d{4}-\d{2}$/.test(s)) return s;
 
-  // "July 2026", "january 2026", etc.
   const named = s.match(/^([A-Za-z]+)\s+(\d{4})$/);
   if (named) {
     const mon = MONTH_NAMES[named[1].toLowerCase()];
     if (mon) return `${named[2]}-${mon}`;
   }
 
-  // "2026/01"
   const slash = s.match(/^(\d{4})\/(\d{2})$/);
   if (slash) return `${slash[1]}-${slash[2]}`;
 
   console.warn(`[clean] Unrecognised month format: "${s}" — skipping row`);
   return null;
 }
-
-// ---------- Levenshtein distance (simple, for name fuzzy-match) ----------
 
 function levenshtein(a: string, b: string): number {
   const m = a.length, n = b.length;
@@ -136,12 +105,8 @@ function levenshtein(a: string, b: string): number {
   return dp[m][n];
 }
 
-/**
- * Check for near-duplicate names in a list (after trimming).
- * We flag but do NOT merge — "Kwame Owusu" and "Kwame Owusu-Ansah" are
- * distinct entries in the HR file, so they are different employees.
- * Distance threshold: ≤3 edits (catches typos/hyphen variants at short-name lengths).
- */
+// We warn about similar names but never merge them: "Kwame Owusu" and
+// "Kwame Owusu-Ansah" are close but are genuinely different employees.
 export function flagNearDuplicateNames(names: string[]): void {
   const unique = [...new Set(names)];
   for (let i = 0; i < unique.length; i++) {
@@ -158,22 +123,17 @@ export function flagNearDuplicateNames(names: string[]): void {
   }
 }
 
-// ---------- Sales cleaning ----------
-
 export function cleanSales(rows: RawSalesRow[]): CleanSalesRow[] {
   const seen = new Set<string>();
   const cleaned: CleanSalesRow[] = [];
 
   for (const row of rows) {
-    // Skip if core fields are missing
     if (!row.repName || !row.region || !row.product || !row.customerName) {
       console.warn("[clean:sales] Skipping row with missing required field:", row);
       continue;
     }
 
-    // Decision: exclude rows with null amounts — revenue is the entire
-    // purpose of the sales dataset; a null amount cannot be imputed safely
-    // (it's not zero; it's unknown). Keeping it would silently undercount revenue.
+    // A null amount is unknown, not zero — keeping it would silently undercount revenue.
     if (row.amount == null || isNaN(row.amount)) {
       console.warn(`[clean:sales] Excluding row with null amount: rep=${row.repName}, product=${row.product}`);
       continue;
@@ -190,7 +150,6 @@ export function cleanSales(rows: RawSalesRow[]): CleanSalesRow[] {
     const product = row.product.trim();
     const customerName = row.customerName.trim();
 
-    // Remove exact duplicates (same date+rep+product+amount+customer)
     const key = `${date}|${repName}|${product}|${row.amount}|${customerName}`;
     if (seen.has(key)) {
       console.warn(`[clean:sales] Removing exact duplicate: ${key}`);
@@ -201,16 +160,12 @@ export function cleanSales(rows: RawSalesRow[]): CleanSalesRow[] {
     cleaned.push({ date, repName, region, product, amount: row.amount, customerName });
   }
 
-  // Flag near-duplicate rep names (informational — we don't merge)
   flagNearDuplicateNames(cleaned.map((r) => r.repName));
 
   return cleaned;
 }
 
-// ---------- HR cleaning ----------
-
 export function cleanHR(rows: RawHRRow[]): CleanHRRow[] {
-  // First pass: trim names, parse dates, drop unresolvable rows
   const parsed: (CleanHRRow & { _rawTarget: number | null })[] = [];
 
   for (const row of rows) {
@@ -234,15 +189,13 @@ export function cleanHR(rows: RawHRRow[]): CleanHRRow[] {
       region,
       department,
       hireDate,
-      monthlyTarget: row.monthlyTarget ?? 0, // placeholder; resolved below
+      monthlyTarget: row.monthlyTarget ?? 0,
       _rawTarget: row.monthlyTarget,
     });
   }
 
-  // Deduplicate by repName: keep the first row that has a valid target.
-  // Rationale: "Naledi Moyo" appears twice — same region/dept, different hire
-  // dates, and the second entry has a null target. We keep the first (which
-  // has a target) and log both so a human can reconcile.
+  // Some reps appear twice with different hire dates; keep the first occurrence
+  // (which tends to carry the target) and log the discarded one for auditing.
   const byName = new Map<string, typeof parsed[0]>();
   for (const row of parsed) {
     const existing = byName.get(row.repName);
@@ -257,9 +210,7 @@ export function cleanHR(rows: RawHRRow[]): CleanHRRow[] {
     }
   }
 
-  // Decision: exclude HR rows with null monthlyTarget — target-vs-actual
-  // is a core metric; a null target makes that metric undefined. We log
-  // so the assessor can see the decision.
+  // Drop reps without a target — target-vs-actual is undefined without one.
   const result: CleanHRRow[] = [];
   for (const row of byName.values()) {
     if (row._rawTarget == null) {
@@ -275,13 +226,10 @@ export function cleanHR(rows: RawHRRow[]): CleanHRRow[] {
     });
   }
 
-  // Flag near-duplicate names (e.g. "Kwame Owusu" vs "Kwame Owusu-Ansah")
   flagNearDuplicateNames(result.map((r) => r.repName));
 
   return result;
 }
-
-// ---------- Finance cleaning ----------
 
 export function cleanFinance(rows: RawFinanceRow[]): CleanFinanceRow[] {
   const seen = new Set<string>();
@@ -295,11 +243,10 @@ export function cleanFinance(rows: RawFinanceRow[]): CleanFinanceRow[] {
 
     const region = row.region.trim();
     const month = toYearMonth(row.month);
-    if (!month) continue; // warning already printed in toYearMonth
+    if (!month) continue;
 
-    // Decision: null targets/costs are set to 0, not excluded — a region
-    // can legitimately have zero cost in a month. Zero is a meaningful value
-    // here, unlike sales amounts where zero means "no transaction."
+    // Here zero is a legitimate value (a region can have no cost in a month),
+    // so null targets/costs become 0 rather than dropping the row.
     const revenueTarget = row.revenueTarget ?? 0;
     const departmentCost = row.departmentCost ?? 0;
 

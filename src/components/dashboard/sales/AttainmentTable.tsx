@@ -1,7 +1,6 @@
 import type { Metrics } from "@/lib/pipeline/metrics";
 import { fmt, pct } from "@/lib/helpers";
 
-/** Actual vs target revenue table with color-coded attainment */
 export default function AttainmentTable({ data }: { data: Metrics["targetVsActual"] }) {
   return (
     <div className="mt-4 overflow-x-auto">
