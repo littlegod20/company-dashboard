@@ -108,3 +108,75 @@ prisma/
 4. Deploy — Vercel runs `npm run build` automatically
 
 > **Note:** Run `npx prisma migrate deploy` in a one-off job before or after first deploy to apply migrations against the production database.
+
+---
+
+## Data Pipeline
+
+The pipeline lives in `src/lib/pipeline/` and is broken into four separate modules. Each stage is pure (no side effects) except for the console logging — making them individually testable and easy to reason about.
+
+### Stage 1 — `parse.ts`
+
+Reads each Excel file from a `Buffer` (or file path) using SheetJS with `cellDates: true` so Excel date serials come back as JS `Date` objects. Three functions: `parseSales`, `parseHR`, `parseFinance`. Each maps raw column names to typed interface properties. **No cleaning happens here** — raw values are preserved exactly as they appear so that `clean.ts` can make explicit, logged decisions.
+
+Real column names discovered by inspection:
+
+| File | Columns |
+|---|---|
+| sales_transactions.xlsx | `Date`, `Rep Name`, `Region`, `Product`, `Amount (USD)`, `Customer Name` |
+| hr_employees.xlsx | `Rep Name`, `Region`, `Department`, `Hire Date`, `Monthly Target (USD)` |
+| finance_targets.xlsx | `Region`, `Month`, `Revenue Target (USD)`, `Department Cost (USD)` |
+
+### Stage 2 — `clean.ts`
+
+Normalises and validates raw data. Every decision is commented inline. Key decisions:
+
+**Dates:**
+- `toISODate()` handles JS `Date` objects, `"DD/MM/YYYY"` strings (`'23/05/2022'` found in HR), ISO `"YYYY-MM-DD"` strings, and Excel serial numbers as a fallback.
+- `toYearMonth()` handles `"YYYY-MM"` (most finance rows) and `"Month YYYY"` (`"July 2026"` found in the real data).
+
+**Null amounts (sales):** Rows with null `Amount (USD)` are **excluded** (3 rows). Rationale: revenue is the entire purpose of the sales dataset — a null amount cannot be safely imputed (it's unknown, not zero). Keeping it would silently undercount revenue.
+
+**Null monthly targets (HR):** Rows with null targets are **excluded** (1 row: second "Naledi Moyo" entry). Rationale: target attainment is a core metric; a null target makes that metric undefined.
+
+**Duplicate HR rows:** "Naledi Moyo" appears twice with different hire dates (2022-10-12 and 2023-06-15). The second entry has a null target. Decision: keep the first row (which has a target of $8,000) and log both so a human can reconcile. The later hire date may represent an internal transfer that was never cleaned up in the source.
+
+**Trailing whitespace:** All string fields are `.trim()`ed in `cleanSales`, `cleanHR`, and `cleanFinance`. This fixed three rep-name mismatches found in the real data: `'Ama Boateng  '`, `'Karim Hassan  '` (trailing spaces in sales), and `'Youssef El-Amin  '` (trailing spaces in HR).
+
+**Near-duplicate names:** `flagNearDuplicateNames()` runs Levenshtein distance on all rep names after trimming and logs any pair within edit distance ≤ 3. `"Kwame Owusu"` and `"Kwame Owusu-Ansah"` have distance 6 — correctly treated as distinct people (both appear as separate entries in the HR file). The threshold flags typos and accidental hyphen variants without merging genuinely different employees.
+
+**Exact duplicates:** Sales rows with the same `date|repName|product|amount|customer` key are removed.
+
+### Stage 3 — `combine.ts`
+
+Joins the three cleaned datasets into a single `EnrichedRow[]` array:
+
+- **Sales → HR** join on `repName.toLowerCase()` (after trimming). Left-join: sales rows without an HR match are kept with `department/hireDate/monthlyTarget = null`. This preserves revenue data even if HR is incomplete.
+- **Enriched → Finance** join on `region.toLowerCase() + yearMonth`. Left-join: rows without a finance match get `revenueTarget/departmentCost = null`.
+
+Both joins use `Map` lookups for O(n) performance.
+
+**Result from real data:** 214 enriched rows, 0 unmatched sales reps, 0 unmatched finance rows.
+
+### Stage 4 — `metrics.ts`
+
+Pure functions over `EnrichedRow[]`. Revenue targets and costs are **de-duplicated by region+month** before summing — otherwise every sale in a region+month would multiply-count the target (which is once per region-month in the Finance table, not once per transaction).
+
+| Metric | Method |
+|---|---|
+| `revenueTrend` | Group-sum `amount` by `yearMonth`, sorted |
+| `targetVsActual` | Actual = sum of amounts; target = sum of unique finance targets per region |
+| `topProducts` | Group-sum `amount` by `product`, top 10 |
+| `marginByRegion` | Revenue minus unique department costs per region |
+| `topReps` | Group-sum `amount` by `repName`, top 10 |
+
+**Sample output from real data:**
+- Total revenue: **$1,110,047.26**
+- Best attainment: West Africa (130.85%)
+- Worst margin: Southern Africa (−$20,179.33)
+- Top product: SmartLock X1 ($255,593)
+- Top rep: Ama Boateng ($117,395)
+
+### API Route — `POST /api/upload`
+
+Accepts `multipart/form-data` with fields `sales`, `hr`, `finance`. Runs the full pipeline, persists all cleaned rows to Postgres in a single transaction (full replace on each upload), and returns the computed metrics as JSON. Upload events are logged to `RawUpload` for auditing.
